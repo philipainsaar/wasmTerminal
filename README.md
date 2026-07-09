@@ -1,17 +1,15 @@
-# Wasm Machine Core V2
+# Wasm Machine Core V3
 
-A louder **Next.js + Three.js + WebAssembly** starter that renders a browser-safe, multi-column glitch diagnostic overlay on top of a 3D animated background.
+A safe **Next.js + Three.js + WebAssembly** diagnostic-style website.
 
-## Version 2 additions
+## Version 3 changes
 
-- Four-column randomized assembly text flood on desktop
-- Two-column mobile fallback
-- Fake memory hex dump bursts
-- BIOS-style boot / POST text
-- CRT scanlines, VHS tear bands, noise veil, chromatic text shadows
-- Text jitter reacts to the Three.js/Wasm pulse output
-- No windows, no panels, no buttons
-- Uses **Rubik Glitch Pop** from Google Fonts
+- Removed the lightning glyph and other non-ASCII glitch symbols from the generated terminal output
+- Uses ASCII-only glitch text such as `##`, `@@`, `%%`, `!!`, `??`, `//`, `<<`, and `>>`
+- Adds a real image file background: `public/background-360.jpg`
+- Uses the image as a 360-degree rotating Three.js sphere behind the machine core
+- Keeps the multi-column assembly text flood from V2
+- Keeps the no-window and no-button layout
 
 ## Run
 
@@ -26,24 +24,16 @@ Open:
 http://localhost:3000
 ```
 
-## Project structure
+## Replace the background image
+
+Replace this file with your own 2:1 panorama-style image:
 
 ```txt
-app/page.jsx
-app/layout.jsx
-app/globals.css
-components/WasmMachineScene.jsx
-public/machine_core.wasm
-wasm-src/machine_core.c
+public/background-360.jpg
 ```
+
+A 2:1 image such as `2048x1024`, `4096x2048`, or similar works best for the rotating inside-sphere background.
 
 ## Safety note
 
-This project does **not** bypass browser security.
-It only shows:
-
-- browser-safe device hints
-- real Wasm module load state
-- stylized randomized assembly-like glitch text
-- simulated memory / hex dump visuals
-- a Three.js animated machine-core background
+This project does not bypass browser security. The text is stylized visual telemetry, while the Wasm module and browser hints are loaded through normal safe browser APIs.
