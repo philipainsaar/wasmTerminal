@@ -6,8 +6,8 @@ import * as THREE from "three";
 const WASM_URL = "/machine_core.wasm";
 const BACKGROUND_URL = "/background-360.jpg";
 const COLUMN_COUNT = 2;
-const MAX_LINES_PER_COLUMN = 32;
-const TEXT_UPDATE_MS = 900;
+const MAX_LINES_PER_COLUMN = 54;
+const TEXT_UPDATE_MS = 650;
 const RENDER_FPS = 30;
 
 const BOOT_LINES = [
@@ -81,6 +81,16 @@ function pushColumnLine(columns, index, line) {
   while (col.length > MAX_LINES_PER_COLUMN) col.shift();
 }
 
+function makeInitialFlood() {
+  const lines = [];
+
+  for (let i = 0; i < MAX_LINES_PER_COLUMN * COLUMN_COUNT; i += 1) {
+    lines.push(makeLine(i, (i * 73) % 4096, Math.abs(Math.sin(i * 0.044)), (i * 31) % 1024, "BOOT FLOOD"));
+  }
+
+  return lines;
+}
+
 export default function WasmMachineScene() {
   const mountRef = useRef(null);
   const columnRefs = useRef([]);
@@ -147,7 +157,7 @@ export default function WasmMachineScene() {
       if (!mount) return;
 
       scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 80);
+      camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 120);
       camera.position.set(0, 0, 7);
 
       renderer = new THREE.WebGLRenderer({
@@ -171,7 +181,7 @@ export default function WasmMachineScene() {
       backgroundTexture.magFilter = THREE.LinearFilter;
       backgroundTexture.generateMipmaps = false;
 
-      const backgroundGeometry = new THREE.CylinderGeometry(28, 28, 22, 28, 1, true);
+      const backgroundGeometry = new THREE.CylinderGeometry(34, 34, 96, 32, 1, true);
       const backgroundMaterial = new THREE.MeshBasicMaterial({
         map: backgroundTexture,
         side: THREE.BackSide,
@@ -232,7 +242,7 @@ export default function WasmMachineScene() {
       return () => window.removeEventListener("resize", handleResize);
     }
 
-    addLines([...BOOT_LINES, ...deviceLines()]);
+    addLines([...BOOT_LINES, ...deviceLines(), ...makeInitialFlood()]);
     loadWasm();
     const removeResize = setupThree();
 
@@ -244,6 +254,7 @@ export default function WasmMachineScene() {
       addLines([
         makeLine(frame, wasmValue, pulseValue, noiseValue, modeRef.current),
         makeLine(frame + 1, wasmValue, pulseValue, noiseValue, modeRef.current),
+        makeLine(frame + 2, wasmValue, pulseValue, noiseValue, modeRef.current),
       ]);
     }, TEXT_UPDATE_MS);
 
