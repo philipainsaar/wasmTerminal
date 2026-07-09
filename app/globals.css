@@ -73,24 +73,24 @@ body {
   position: absolute;
   inset: 0;
   z-index: 3;
-  padding: max(14px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom))
-    max(12px, env(safe-area-inset-left));
+  padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom))
+    max(10px, env(safe-area-inset-left));
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   pointer-events: none;
 }
 
 .overlayHead {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 4px;
 }
 
 .overlayKicker {
   color: rgba(255, 255, 255, 0.9);
-  font-size: clamp(0.72rem, 1.65vw, 1.08rem);
-  line-height: 1.02;
+  font-size: clamp(0.82rem, 1.9vw, 1.28rem);
+  line-height: 0.95;
   letter-spacing: 0.03em;
   text-shadow: 0 0 6px rgba(143, 220, 255, 0.42);
 }
@@ -99,8 +99,8 @@ body {
   margin: 0;
   max-width: min(96vw, 1100px);
   color: #ffffff;
-  font-size: clamp(2.2rem, 9vw, 7.4rem);
-  line-height: 0.72;
+  font-size: clamp(1.8rem, 7.5vw, 5.9rem);
+  line-height: 0.7;
   letter-spacing: 0.015em;
   text-shadow:
     1px 0 0 rgba(255, 78, 211, 0.36),
@@ -115,26 +115,29 @@ body {
   gap: clamp(0.42rem, 1vw, 0.9rem);
   overflow: hidden;
   min-height: 0;
+  height: 100%;
+  align-items: stretch;
 }
 
 .terminalColumn {
   margin: 0;
   min-width: 0;
+  height: 100%;
   overflow: hidden;
   white-space: pre-wrap;
   word-break: break-word;
   color: rgba(255, 255, 255, 0.92);
   font-family: "Bytesized", ui-monospace, monospace;
-  font-size: clamp(0.58rem, 1vw, 0.9rem);
-  line-height: 0.98;
-  letter-spacing: 0.025em;
+  font-size: clamp(1.02rem, 2.08vw, 1.72rem);
+  line-height: 0.9;
+  letter-spacing: 0.018em;
   text-shadow: 0 0 5px rgba(255, 255, 255, 0.34);
   transform: translateZ(0);
 }
 
 .terminalColumn:nth-child(2) {
   opacity: 0.74;
-  transform: translate3d(0, -16px, 0);
+  transform: translate3d(0, -8px, 0);
 }
 
 @media (max-width: 760px) {
@@ -147,11 +150,15 @@ body {
   }
 
   .overlayTitle {
-    font-size: clamp(2rem, 12vw, 4.3rem);
+    font-size: clamp(1.65rem, 10vw, 3.4rem);
+  }
+
+  .overlayKicker {
+    font-size: clamp(0.78rem, 3vw, 1rem);
   }
 
   .terminalColumn {
-    font-size: clamp(0.6rem, 2.6vw, 0.86rem);
-    line-height: 0.96;
+    font-size: clamp(1rem, 4.6vw, 1.4rem);
+    line-height: 0.88;
   }
 }
