@@ -1,10 +1,126 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
-const MAX_LINES = 30;
+const MAX_LINES = 140;
 const WASM_URL = "/machine_core.wasm";
+const GLITCH_TOKENS = [
+  "▓",
+  "▒",
+  "░",
+  "█",
+  "∆",
+  "¤",
+  "※",
+  "⚡",
+  "::",
+  "//",
+  "<<",
+  ">>",
+  "~~",
+  "<>",
+  "µ",
+  "~#",
+];
+const OPCODES = [
+  "MOV",
+  "XOR",
+  "AND",
+  "OR",
+  "NOT",
+  "SHL",
+  "SHR",
+  "SUB",
+  "ADD",
+  "ADC",
+  "MUL",
+  "F32.MUL",
+  "F32.ADD",
+  "I32.NOISE",
+  "PULSE",
+  "STACK.PUSH",
+  "STACK.POP",
+  "DMA.COPY",
+  "VRAM.MAP",
+  "GLYPH.DECODE",
+  "GLITCH.MIX",
+  "SCAN.RASTER",
+  "TEXTURE.BIND",
+  "WASM.CALL",
+  "BR_IF",
+  "JMP",
+  "NOP",
+];
+const TARGETS = [
+  "R0",
+  "R1",
+  "R2",
+  "R3",
+  "R4",
+  "R5",
+  "R6",
+  "R7",
+  "AX",
+  "BX",
+  "CX",
+  "DX",
+  "VEC0",
+  "VEC1",
+  "BUS0",
+  "STACK",
+  "GPU_PIPE",
+  "SCAN_BUFFER",
+  "NOISE_BANK",
+  "FRAME_LATCH",
+  "SIGNAL_CORE",
+  "THREE_PORT",
+  "WASM_PAGE",
+  "WAVE_TABLE",
+  "GHOST_CACHE",
+];
+const CALLS = [
+  "$scanTick",
+  "$pulse",
+  "$noise2",
+  "$phase_core",
+  "$render_loop",
+  "$glyph_shift",
+  "$vector_gate",
+  "$safe_mode",
+  "$echo_bus",
+  "$page_swap",
+];
+
+function choose(list) {
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function randomHex(length) {
+  const chars = "0123456789ABCDEF";
+  let result = "";
+
+  for (let i = 0; i < length; i += 1) {
+    result += chars[Math.floor(Math.random() * chars.length)];
+  }
+
+  return result;
+}
+
+function randomAddress() {
+  return `${randomHex(4)}:${randomHex(4)}:${randomHex(4)}`;
+}
+
+function randomAsciiBlock(size = 8) {
+  const chars = "01ABCDEF<>[]{}/*-_=+|~^:;▓▒░█∆¤※⚡";
+  let block = "";
+
+  for (let i = 0; i < size; i += 1) {
+    block += chars[Math.floor(Math.random() * chars.length)];
+  }
+
+  return block;
+}
 
 function getDeviceHints() {
   const nav = typeof navigator === "undefined" ? {} : navigator;
@@ -14,6 +130,7 @@ function getDeviceHints() {
     memory: nav.deviceMemory ? `~${nav.deviceMemory} GB` : "hidden",
     userAgent: nav.userAgent || "hidden",
     platform: nav.userAgentData?.platform || nav.platform || "hidden",
+    language: nav.language || "hidden",
   };
 }
 
@@ -51,53 +168,87 @@ function formatExportList(exportsList) {
 
 function makeBootLines({ device, gpu }) {
   return [
-    "DREAM-WEB DIAGNOSTIC CORE // SAFE MODE",
-    "---------------------------------------",
-    `[DEVICE] CPU THREAD HINT: ${device.cpuThreads}`,
-    `[DEVICE] RAM HINT: ${device.memory}`,
-    `[DEVICE] PLATFORM HINT: ${device.platform}`,
-    `[DEVICE] GPU HINT: ${gpu}`,
-    "[NOTICE] Browser sandbox is active. No private RAM or native CPU instructions are read.",
-    "",
-    "[WASM] Fetching machine_core.wasm...",
+    "[SAFE-BOOT] RUBIK GLITCH POP OVERLAY ACTIVE",
+    "[NOTICE] Browser sandbox preserved // no private RAM or native CPU instruction access",
+    `[DEVICE] THREAD_HINT=${device.cpuThreads}  MEM_HINT=${device.memory}  PLATFORM=${device.platform}`,
+    `[DEVICE] GPU_HINT=${gpu}`,
+    `[LOCALE] LANG=${device.language}  UA=${String(device.userAgent).slice(0, 54)}...`,
+    "[PIPE] NEXT.JS -> THREE.JS -> WASM -> GLITCH TEXT STREAM",
+    "[WASM] FETCH /machine_core.wasm",
   ];
 }
 
-function makeAssemblyFlavor(frame, wasmValue, pulseValue, noiseValue) {
-  const bank = (frame % 256).toString(16).padStart(2, "0").toUpperCase();
-  const sig = Number(wasmValue || 0).toString(16).padStart(4, "0").toUpperCase();
-  const pulse = Number(Math.round((pulseValue || 0) * 1000)).toString().padStart(4, "0");
-  const noise = Number(noiseValue || 0).toString(16).padStart(3, "0").toUpperCase();
-
+function makeWasmSummary(exports, exportsList, imports, pages) {
   return [
-    `> MOV R${frame % 8}, 0x${sig}`,
-    `> F32.PULSE ${pulse} ; wasm.pulse(frame)` ,
-    `> I32.NOISE  0x${noise} ; wasm.noise2(x,y)`,
-    `> DMA.GLYPH_BANK[${bank}] -> THREE_BUFFER`,
-    "> JMP RENDER_LOOP",
+    "[WASM] machine_core.wasm loaded",
+    `[WASM] imports=${imports.length || "none"}`,
+    `[WASM] exports=${formatExportList(exportsList)}`,
+    `[WASM] memory_pages=${pages}  memory_total=${pages === "hidden" ? "hidden" : `${pages * 64}KB`}`,
+    `[WASM] magic=0x${exports.getMagic?.().toString(16).toUpperCase() || "hidden"}`,
+    "[MODE] VISUAL CORE ONLINE // CHAOTIC TEXT BURST ENABLED",
   ];
+}
+
+function makeGlitchBurst(frame, wasmValue, pulseValue, noiseValue, mode) {
+  const pulseInt = Math.round((pulseValue || 0) * 10000);
+  const burstSize = 10 + Math.floor(Math.random() * 8);
+  const lines = [];
+
+  lines.push(`[FRAME ${String(frame).padStart(5, "0")}] MODE=${mode} ${randomAsciiBlock(10)}`);
+
+  for (let i = 0; i < burstSize; i += 1) {
+    const selector = Math.floor(Math.random() * 8);
+
+    if (selector === 0) {
+      lines.push(
+        `> ${choose(OPCODES)} ${choose(TARGETS)}, 0x${randomHex(4)}  ${choose(GLITCH_TOKENS)} ${randomAsciiBlock(6)}`
+      );
+    } else if (selector === 1) {
+      lines.push(
+        `> ${choose(OPCODES)} ${choose(TARGETS)} <- ${choose(CALLS)}(${frame % 256}, ${noiseValue % 97})`
+      );
+    } else if (selector === 2) {
+      lines.push(
+        `> BUS[${randomAddress()}] => 0x${randomHex(2)} 0x${randomHex(2)} 0x${randomHex(2)} 0x${randomHex(2)} ${choose(GLITCH_TOKENS)}`
+      );
+    } else if (selector === 3) {
+      lines.push(
+        `> F32.PULSE ${String(pulseInt).padStart(5, "0")} | I32.NOISE 0x${Number(noiseValue || 0)
+          .toString(16)
+          .toUpperCase()} | SCAN=0x${Number(wasmValue || 0).toString(16).toUpperCase()}`
+      );
+    } else if (selector === 4) {
+      lines.push(
+        `> GLITCH.VECTOR ${randomAsciiBlock(4)} ${randomAsciiBlock(4)} ${randomAsciiBlock(4)} ${randomAsciiBlock(4)}`
+      );
+    } else if (selector === 5) {
+      lines.push(
+        `> TRACE ${choose(TARGETS)} -> ${choose(TARGETS)} -> ${choose(TARGETS)} // ${choose(CALLS)} ${choose(GLITCH_TOKENS)}`
+      );
+    } else if (selector === 6) {
+      lines.push(
+        `> DMA.GLYPH_BANK[0x${randomHex(2)}] -> THREE_BUFFER[${frame % 64}] // ${randomAsciiBlock(12)}`
+      );
+    } else {
+      lines.push(
+        `> ${choose(OPCODES)} ${choose(TARGETS)}, ${choose(TARGETS)} ; FLAG=${choose(["ZERO", "CARRY", "SAFE", "GLITCH", "WAVE", "LATCH"])} ; ${choose(GLITCH_TOKENS)} ${randomHex(6)}`
+      );
+    }
+  }
+
+  if (Math.random() > 0.4) {
+    lines.push(`[GLITCH] ${randomAsciiBlock(18)} ${choose(GLITCH_TOKENS)} ${randomAsciiBlock(18)}`);
+  }
+
+  return lines;
 }
 
 export default function WasmMachineScene() {
   const mountRef = useRef(null);
   const wasmRef = useRef(null);
   const frameRef = useRef(0);
-  const [terminalLines, setTerminalLines] = useState([
-    "Starting browser-safe machine layer...",
-  ]);
-  const [status, setStatus] = useState("BOOTING");
-
-  const watPreview = useMemo(
-    () => [
-      "(module",
-      "  (memory (export \"memory\") 2)",
-      "  (func (export \"scanTick\") (param i32) (result i32) ...)",
-      "  (func (export \"noise2\") (param i32 i32) (result i32) ...)",
-      "  (func (export \"pulse\") (param f32) (result f32) ...)",
-      ")",
-    ],
-    []
-  );
+  const modeRef = useRef("BOOTING");
+  const [terminalLines, setTerminalLines] = useState(["[BOOT] STARTING..."]);
 
   useEffect(() => {
     let disposed = false;
@@ -126,31 +277,19 @@ export default function WasmMachineScene() {
         const exports = instance.exports;
 
         wasmRef.current = exports;
+        modeRef.current = "WASM ONLINE";
 
         const pages = exports.memory
           ? Math.round(exports.memory.buffer.byteLength / 65536)
           : "hidden";
 
-        appendLines([
-          "[WASM] machine_core.wasm loaded",
-          `[WASM] imports: ${imports.length || "none"}`,
-          `[WASM] exports: ${formatExportList(exportsList)}`,
-          `[WASM] memory pages: ${pages} page(s) / ${pages === "hidden" ? "hidden" : pages * 64 + " KB"}`,
-          `[WASM] magic: 0x${exports.getMagic?.().toString(16).toUpperCase() || "hidden"}`,
-          "",
-          "[WAT PREVIEW]",
-          ...watPreview,
-          "",
-          "[RENDER] Three.js scene connected to Wasm output",
-        ]);
-
-        setStatus("WASM ONLINE");
+        appendLines(makeWasmSummary(exports, exportsList, imports, pages));
       } catch (error) {
+        modeRef.current = "VISUAL FALLBACK";
         appendLines([
-          "[WASM] Load failed. Visual fallback is still running.",
+          "[WASM] load failed // visual fallback remains active",
           `[WASM] ${error?.message || "unknown error"}`,
         ]);
-        setStatus("VISUAL FALLBACK");
       }
     }
 
@@ -173,7 +312,7 @@ export default function WasmMachineScene() {
         color: 0x8fdcff,
         wireframe: true,
         transparent: true,
-        opacity: 0.9,
+        opacity: 0.95,
       });
       core = new THREE.Mesh(coreGeometry, coreMaterial);
       scene.add(core);
@@ -198,10 +337,10 @@ export default function WasmMachineScene() {
       created.push(ringGeometry, ringMaterialA, ringMaterialB);
 
       const particleGeometry = new THREE.BufferGeometry();
-      const particleCount = 120;
+      const particleCount = 160;
       const positions = new Float32Array(particleCount * 3);
 
-      for (let i = 0; i < particleCount; i++) {
+      for (let i = 0; i < particleCount; i += 1) {
         const radius = 2.2 + Math.random() * 2.5;
         const angle = Math.random() * Math.PI * 2;
         positions[i * 3] = Math.cos(angle) * radius;
@@ -237,7 +376,9 @@ export default function WasmMachineScene() {
 
         const wasmValue = wasm?.scanTick ? wasm.scanTick(frame) : (frame * 73) % 4096;
         const pulseValue = wasm?.pulse ? wasm.pulse(frame * 0.011) : Math.abs(Math.sin(frame * 0.025));
-        const noiseValue = wasm?.noise2 ? wasm.noise2(frame, Math.round(pulseValue * 1000)) : (frame * 31) % 1024;
+        const noiseValue = wasm?.noise2
+          ? wasm.noise2(frame, Math.round(pulseValue * 1000))
+          : (frame * 31) % 1024;
 
         const pulseScale = 1 + pulseValue * 0.12;
         core.scale.setScalar(pulseScale);
@@ -252,8 +393,8 @@ export default function WasmMachineScene() {
         const huePulse = 0.55 + pulseValue * 0.08;
         core.material.color.setHSL(huePulse, 0.85, 0.75);
 
-        if (frame % 42 === 0) {
-          appendLines(makeAssemblyFlavor(frame, wasmValue, pulseValue, noiseValue));
+        if (frame % 10 === 0) {
+          appendLines(makeGlitchBurst(frame, wasmValue, pulseValue, noiseValue, modeRef.current));
         }
 
         renderer.render(scene, camera);
@@ -282,24 +423,23 @@ export default function WasmMachineScene() {
       created.forEach((item) => item.dispose?.());
       if (mountRef.current) mountRef.current.innerHTML = "";
     };
-  }, [watPreview]);
+  }, []);
 
   return (
     <main className="machineScreen">
       <div className="glowLayer glowOne" />
       <div className="glowLayer glowTwo" />
       <div ref={mountRef} className="threeLayer" />
+      <div className="noiseVeil" />
+      <div className="scanlines" />
 
-      <section className="terminalPanel" aria-label="WebAssembly diagnostic terminal">
-        <div className="terminalHeader">
-          <div>
-            <span className="eyebrow">SAFE WEB DIAGNOSTIC</span>
-            <h1>WASM MACHINE CORE</h1>
-          </div>
-          <div className="statusPill">{status}</div>
+      <section className="textOverlay" aria-label="WebAssembly diagnostic text overlay">
+        <div className="overlayHead">
+          <div className="overlayKicker">SAFE WEB DIAGNOSTIC // GLITCH STREAM // NO WINDOWS // NO BUTTONS</div>
+          <h1 className="overlayTitle">WASM MACHINE CORE</h1>
         </div>
 
-        <div className="terminalBody">
+        <div className="terminalStream">
           {terminalLines.map((line, index) => (
             <div key={`${line}-${index}`} className={line === "" ? "terminalSpacer" : "terminalLine"}>
               {line}
@@ -307,10 +447,6 @@ export default function WasmMachineScene() {
           ))}
         </div>
       </section>
-
-      <div className="bottomBadge">
-        Browser-safe hints + real Wasm exports + stylized assembly output
-      </div>
     </main>
   );
 }
