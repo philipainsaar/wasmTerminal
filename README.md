@@ -1,17 +1,17 @@
-# Next.js + Three.js + WebAssembly Diagnostic Terminal
+# Wasm Machine Core V2
 
-This is a safe browser-based diagnostic-style interface.
+A louder **Next.js + Three.js + WebAssembly** starter that renders a browser-safe, multi-column glitch diagnostic overlay on top of a 3D animated background.
 
-It shows:
+## Version 2 additions
 
-- safe browser device hints
-- WebGL renderer hints when available
-- real WebAssembly module exports
-- real WebAssembly memory size
-- Three.js visuals driven by WebAssembly functions
-- stylized assembly-like terminal output
-
-It does **not** bypass browser security, read private RAM, inspect native CPU instructions, or access internal hardware.
+- Four-column randomized assembly text flood on desktop
+- Two-column mobile fallback
+- Fake memory hex dump bursts
+- BIOS-style boot / POST text
+- CRT scanlines, VHS tear bands, noise veil, chromatic text shadows
+- Text jitter reacts to the Three.js/Wasm pulse output
+- No windows, no panels, no buttons
+- Uses **Rubik Glitch Pop** from Google Fonts
 
 ## Run
 
@@ -26,7 +26,7 @@ Open:
 http://localhost:3000
 ```
 
-## Files
+## Project structure
 
 ```txt
 app/page.jsx
@@ -37,15 +37,13 @@ public/machine_core.wasm
 wasm-src/machine_core.c
 ```
 
-## Rebuild the Wasm file manually
+## Safety note
 
-If you have clang with a wasm target:
+This project does **not** bypass browser security.
+It only shows:
 
-```bash
-clang --target=wasm32 -Oz -nostdlib \
-  -Wl,--no-entry \
-  -Wl,--export-all \
-  -Wl,--export-memory \
-  -o public/machine_core.wasm \
-  wasm-src/machine_core.c
-```
+- browser-safe device hints
+- real Wasm module load state
+- stylized randomized assembly-like glitch text
+- simulated memory / hex dump visuals
+- a Three.js animated machine-core background
