@@ -4,22 +4,23 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
 const WASM_URL = "/machine_core.wasm";
-const COLUMN_COUNT = 3;
-const MAX_LINES_PER_COLUMN = 38;
-const TEXT_UPDATE_MS = 650;
-const RENDER_FPS = 24;
+const BACKGROUND_URL = "/background-360.jpg";
+const COLUMN_COUNT = 2;
+const MAX_LINES_PER_COLUMN = 32;
+const TEXT_UPDATE_MS = 900;
+const RENDER_FPS = 30;
 
 const BOOT_LINES = [
-  "DREAM-WEB BIOS LITE // PERFORMANCE MODE",
+  "WEB BIOS // THREE PANORAMA FAST MODE",
   "SAFE_BROWSER_SANDBOX LOCKED",
-  "LOAD CSS IMAGE ORBIT BACKDROP .......... OK",
-  "LOAD LOW POLY THREE CORE ............... OK",
+  "LOAD THREE IMAGE CYLINDER .............. OK",
+  "LOAD LOW POLY MACHINE CORE ............. OK",
   "LOAD WASM MODULE ....................... PENDING",
   "TEXT STREAM MODE ....................... DOM DIRECT",
-  "REACT RERENDER LOOP .................... DISABLED",
-  "HEAVY 360 SPHERE ........................ REMOVED",
+  "REACT TEXT RERENDER LOOP ............... DISABLED",
+  "HEAVY PANORAMA SPHERE .................. REMOVED",
   "PARTICLE FIELD .......................... REMOVED",
-  "BOOT COMPLETE // FAST PATH ACTIVE",
+  "BOOT COMPLETE // FAST THREE PATH ACTIVE",
 ];
 
 const OPS = [
@@ -31,7 +32,7 @@ const REGS = [
   "R0", "R1", "R2", "R3", "AX", "BX", "CX", "DX", "VEC0", "VEC1", "BUS0", "STACK", "GPU_PIPE", "WASM_PAGE", "SCAN_BUF", "FRAME"
 ];
 
-const CALLS = ["$scanTick", "$pulse", "$noise2", "$safe_mode", "$render_core", "$image_orbit", "$glyph_tick"];
+const CALLS = ["$scanTick", "$pulse", "$noise2", "$safe_mode", "$render_core", "$panorama_tick", "$glyph_tick"];
 const TOKENS = ["##", "@@", "%%", "$$", "++", "==", "!!", "??", "::", "//", "<<", ">>", "~~", "NULL", "SAFE", "VOID"];
 
 function choose(list) {
@@ -58,20 +59,19 @@ function deviceLines() {
     `[DEVICE] THREAD_HINT=${nav.hardwareConcurrency || "hidden"}`,
     `[DEVICE] MEM_HINT=${nav.deviceMemory ? `~${nav.deviceMemory}GB` : "hidden"}`,
     `[DEVICE] PLATFORM=${nav.userAgentData?.platform || nav.platform || "hidden"}`,
-    `[MODE] FAST DOM TEXT // CSS BACKGROUND ORBIT`,
+    `[MODE] FAST DOM TEXT // THREE PANORAMA CYLINDER`,
   ];
 }
 
 function makeLine(frame, wasmValue, pulseValue, noiseValue, mode) {
-  const selector = Math.floor(Math.random() * 9);
+  const selector = Math.floor(Math.random() * 8);
   if (selector === 0) return `> ${choose(OPS)} ${choose(REGS)}, 0x${hex(4)} ${choose(TOKENS)} ${ascii(8)}`;
   if (selector === 1) return `> ${choose(OPS)} ${choose(REGS)} <- ${choose(CALLS)}(${frame % 256}, ${noiseValue % 97})`;
   if (selector === 2) return `> BUS[${hex(4)}:${hex(4)}] => 0x${hex(2)} 0x${hex(2)} 0x${hex(2)} ${choose(TOKENS)}`;
   if (selector === 3) return `> PULSE=${Math.round(pulseValue * 9999).toString().padStart(4, "0")} SCAN=0x${Number(wasmValue).toString(16).toUpperCase()} NOISE=0x${Number(noiseValue).toString(16).toUpperCase()}`;
   if (selector === 4) return `> TRACE ${choose(REGS)} -> ${choose(REGS)} -> ${choose(REGS)} // ${choose(CALLS)}`;
-  if (selector === 5) return `> DMA.TEXT_BANK[0x${hex(2)}] -> CSS_LAYER[${frame % 64}] // ${ascii(14)}`;
-  if (selector === 6) return `[FAST] ${mode} FRAME=${String(frame).padStart(5, "0")} ORBIT=${hex(4)} ${ascii(10)}`;
-  if (selector === 7) return `[HEX] 0x${hex(6)} ${hex(2)} ${hex(2)} ${hex(2)} ${hex(2)} ${hex(2)} ${hex(2)} ${choose(TOKENS)}`;
+  if (selector === 5) return `> DMA.TEXT_BANK[0x${hex(2)}] -> DOM_LAYER[${frame % 64}] // ${ascii(12)}`;
+  if (selector === 6) return `[FAST] ${mode} FRAME=${String(frame).padStart(5, "0")} PAN=${hex(4)} ${ascii(8)}`;
   return `> ${choose(OPS)} ${choose(REGS)}, ${choose(REGS)} ; FLAG=${choose(["ZERO", "CARRY", "SAFE", "WAVE", "LATCH"])} ; ${hex(6)}`;
 }
 
@@ -83,7 +83,6 @@ function pushColumnLine(columns, index, line) {
 
 export default function WasmMachineScene() {
   const mountRef = useRef(null);
-  const overlayRef = useRef(null);
   const columnRefs = useRef([]);
   const wasmRef = useRef(null);
   const modeRef = useRef("BOOTING");
@@ -96,6 +95,8 @@ export default function WasmMachineScene() {
     let core;
     let ringA;
     let ringB;
+    let backgroundMesh;
+    let backgroundTexture;
     let animationId;
     let frame = 0;
     let lastRender = 0;
@@ -146,23 +147,52 @@ export default function WasmMachineScene() {
       if (!mount) return;
 
       scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 60);
+      camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 80);
       camera.position.set(0, 0, 7);
 
-      renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: "high-performance" });
+      renderer = new THREE.WebGLRenderer({
+        antialias: false,
+        alpha: false,
+        powerPreference: "high-performance",
+        stencil: false,
+        depth: true,
+      });
       renderer.setPixelRatio(1);
       renderer.setSize(window.innerWidth, window.innerHeight, false);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
       mount.appendChild(renderer.domElement);
 
-      const coreGeometry = new THREE.IcosahedronGeometry(1.25, 0);
-      const coreMaterial = new THREE.MeshBasicMaterial({ color: 0x8fdcff, wireframe: true, transparent: true, opacity: 0.86 });
+      const textureLoader = new THREE.TextureLoader();
+      backgroundTexture = textureLoader.load(BACKGROUND_URL);
+      backgroundTexture.colorSpace = THREE.SRGBColorSpace;
+      backgroundTexture.wrapS = THREE.RepeatWrapping;
+      backgroundTexture.wrapT = THREE.ClampToEdgeWrapping;
+      backgroundTexture.minFilter = THREE.LinearFilter;
+      backgroundTexture.magFilter = THREE.LinearFilter;
+      backgroundTexture.generateMipmaps = false;
+
+      const backgroundGeometry = new THREE.CylinderGeometry(28, 28, 22, 28, 1, true);
+      const backgroundMaterial = new THREE.MeshBasicMaterial({
+        map: backgroundTexture,
+        side: THREE.BackSide,
+        depthWrite: false,
+        depthTest: false,
+      });
+      backgroundMesh = new THREE.Mesh(backgroundGeometry, backgroundMaterial);
+      backgroundMesh.rotation.y = Math.PI;
+      backgroundMesh.renderOrder = -10;
+      scene.add(backgroundMesh);
+      created.push(backgroundGeometry, backgroundMaterial);
+
+      const coreGeometry = new THREE.IcosahedronGeometry(1.2, 0);
+      const coreMaterial = new THREE.MeshBasicMaterial({ color: 0x8fdcff, wireframe: true, transparent: true, opacity: 0.82 });
       core = new THREE.Mesh(coreGeometry, coreMaterial);
       scene.add(core);
       created.push(coreGeometry, coreMaterial);
 
-      const ringGeometry = new THREE.TorusGeometry(1.85, 0.01, 4, 32);
-      const ringMaterialA = new THREE.MeshBasicMaterial({ color: 0xffa8df, transparent: true, opacity: 0.72 });
-      const ringMaterialB = new THREE.MeshBasicMaterial({ color: 0xb9a6ff, transparent: true, opacity: 0.62 });
+      const ringGeometry = new THREE.TorusGeometry(1.78, 0.01, 4, 28);
+      const ringMaterialA = new THREE.MeshBasicMaterial({ color: 0xffa8df, transparent: true, opacity: 0.68 });
+      const ringMaterialB = new THREE.MeshBasicMaterial({ color: 0xb9a6ff, transparent: true, opacity: 0.58 });
       ringA = new THREE.Mesh(ringGeometry, ringMaterialA);
       ringB = new THREE.Mesh(ringGeometry, ringMaterialB);
       ringA.rotation.x = Math.PI / 2.35;
@@ -186,17 +216,14 @@ export default function WasmMachineScene() {
         frame += 1;
         const wasm = wasmRef.current;
         const wasmValue = wasm?.scanTick ? wasm.scanTick(frame) : (frame * 73) % 4096;
-        const pulseValue = wasm?.pulse ? wasm.pulse(frame * 0.018) : Math.abs(Math.sin(frame * 0.036));
+        const pulseValue = wasm?.pulse ? wasm.pulse(frame * 0.022) : Math.abs(Math.sin(frame * 0.044));
 
-        core.rotation.x += 0.028 + wasmValue * 0.0000006;
-        core.rotation.y += 0.038;
-        core.scale.setScalar(1 + pulseValue * 0.08);
-        ringA.rotation.z += 0.035;
-        ringB.rotation.x += 0.03;
-
-        if (overlayRef.current && frame % 2 === 0) {
-          overlayRef.current.style.setProperty("--pulse", String(0.5 + pulseValue * 0.5));
-        }
+        backgroundMesh.rotation.y += 0.018;
+        core.rotation.x += 0.04 + wasmValue * 0.0000006;
+        core.rotation.y += 0.055;
+        core.scale.setScalar(1 + pulseValue * 0.07);
+        ringA.rotation.z += 0.05;
+        ringB.rotation.x += 0.043;
 
         renderer.render(scene, camera);
       }
@@ -212,12 +239,11 @@ export default function WasmMachineScene() {
     textTimer = setInterval(() => {
       const wasm = wasmRef.current;
       const wasmValue = wasm?.scanTick ? wasm.scanTick(frame) : (frame * 73) % 4096;
-      const pulseValue = wasm?.pulse ? wasm.pulse(frame * 0.018) : Math.abs(Math.sin(frame * 0.036));
+      const pulseValue = wasm?.pulse ? wasm.pulse(frame * 0.022) : Math.abs(Math.sin(frame * 0.044));
       const noiseValue = wasm?.noise2 ? wasm.noise2(frame, Math.round(pulseValue * 1000)) : (frame * 31) % 1024;
       addLines([
         makeLine(frame, wasmValue, pulseValue, noiseValue, modeRef.current),
         makeLine(frame + 1, wasmValue, pulseValue, noiseValue, modeRef.current),
-        makeLine(frame + 2, wasmValue, pulseValue, noiseValue, modeRef.current),
       ]);
     }, TEXT_UPDATE_MS);
 
@@ -226,6 +252,7 @@ export default function WasmMachineScene() {
       clearInterval(textTimer);
       cancelAnimationFrame(animationId);
       removeResize?.();
+      if (backgroundTexture) backgroundTexture.dispose();
       if (renderer) renderer.dispose();
       created.forEach((item) => item.dispose?.());
       if (mountRef.current) mountRef.current.innerHTML = "";
@@ -234,15 +261,14 @@ export default function WasmMachineScene() {
 
   return (
     <main className="machineScreen">
-      <div className="imageOrbit" />
-      <div className="softTint" />
       <div ref={mountRef} className="threeLayer" />
+      <div className="softTint" />
       <div className="scanlines" />
 
-      <section ref={overlayRef} className="textOverlay" aria-label="WebAssembly diagnostic text overlay">
+      <section className="textOverlay" aria-label="WebAssembly diagnostic text overlay">
         <div className="overlayHead">
-          <div className="overlayKicker">SAFE WEB DIAGNOSTIC // ULTRA FAST // CSS IMAGE ORBIT</div>
-          <h1 className="overlayTitle">WASM CORE LITE</h1>
+          <div className="overlayKicker">SAFE WEB DIAGNOSTIC // FAST THREE PANORAMA // BYTESIZED</div>
+          <h1 className="overlayTitle">WASM CORE</h1>
         </div>
 
         <div className="columnGrid">
