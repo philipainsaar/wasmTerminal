@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Wasm Glitch Diagnostic",
-  description: "A safe WebAssembly, Next.js, and Three.js glitch diagnostic overlay.",
+  title: "Wasm Machine Core V2",
+  description: "A safe WebAssembly, Next.js, and Three.js multi-column glitch diagnostic overlay.",
 };
 
 export default function RootLayout({ children }) {
