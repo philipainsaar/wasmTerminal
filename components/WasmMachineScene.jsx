@@ -9,16 +9,20 @@ const COLUMN_COUNT = 2;
 const MAX_LINES_PER_COLUMN = 54;
 const TEXT_UPDATE_MS = 650;
 const RENDER_FPS = 30;
+const FALLING_TRIANGLE_COUNT_DESKTOP = 34;
+const FALLING_TRIANGLE_COUNT_MOBILE = 20;
+const PANORAMA_RADIUS = 38;
+const PANORAMA_HEIGHT = 136;
 
 const BOOT_LINES = [
   "WEB BIOS // THREE PANORAMA FAST MODE",
   "SAFE_BROWSER_SANDBOX LOCKED",
-  "LOAD THREE IMAGE CYLINDER .............. OK",
+  "LOAD TRIANGLE PANORAMA MESH ............ OK",
   "LOAD LOW POLY MACHINE CORE ............. OK",
   "LOAD WASM MODULE ....................... PENDING",
   "TEXT STREAM MODE ....................... DOM DIRECT",
   "REACT TEXT RERENDER LOOP ............... DISABLED",
-  "HEAVY PANORAMA SPHERE .................. REMOVED",
+  "FALLING TRIANGLE SHARDS ................ ENABLED",
   "PARTICLE FIELD .......................... REMOVED",
   "BOOT COMPLETE // FAST THREE PATH ACTIVE",
 ];
@@ -53,13 +57,115 @@ function ascii(size = 8) {
   return result;
 }
 
+
+function createTriangulatedPanoramaGeometry(radius = PANORAMA_RADIUS, height = PANORAMA_HEIGHT, radialSegments = 28, heightSegments = 9) {
+  const positions = [];
+  const uvs = [];
+  const halfHeight = height / 2;
+
+  function pushVertex(angle, y, u, v) {
+    positions.push(Math.sin(angle) * radius, y, Math.cos(angle) * radius);
+    uvs.push(u, v);
+  }
+
+  for (let yIndex = 0; yIndex < heightSegments; yIndex += 1) {
+    const v0 = yIndex / heightSegments;
+    const v1 = (yIndex + 1) / heightSegments;
+    const y0 = -halfHeight + v0 * height;
+    const y1 = -halfHeight + v1 * height;
+
+    for (let xIndex = 0; xIndex < radialSegments; xIndex += 1) {
+      const u0 = xIndex / radialSegments;
+      const u1 = (xIndex + 1) / radialSegments;
+      const a0 = u0 * Math.PI * 2;
+      const a1 = u1 * Math.PI * 2;
+
+      pushVertex(a0, y0, u0, v0);
+      pushVertex(a1, y0, u1, v0);
+      pushVertex(a1, y1, u1, v1);
+
+      pushVertex(a0, y0, u0, v0);
+      pushVertex(a1, y1, u1, v1);
+      pushVertex(a0, y1, u0, v1);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function createTriangleShardGeometry() {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute([
+      0, 0.76, 0,
+      -0.68, -0.44, 0,
+      0.68, -0.44, 0,
+    ], 3)
+  );
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute([0.5, 1, 0, 0, 1, 0], 2));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function applyShardTextureWindow(shard) {
+  if (!shard.texture) return;
+
+  const uCenter = ((shard.sourceAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / (Math.PI * 2);
+  const vCenter = 1 - ((shard.sourceY + PANORAMA_HEIGHT / 2) / PANORAMA_HEIGHT);
+  const uSpan = shard.uSpan;
+  const vSpan = shard.vSpan;
+  const offsetX = uCenter - uSpan * 0.5;
+  const offsetY = THREE.MathUtils.clamp(vCenter - vSpan * 0.5, 0, 1 - vSpan);
+
+  shard.texture.repeat.set(uSpan, vSpan);
+  shard.texture.offset.set(offsetX, offsetY);
+  shard.texture.needsUpdate = true;
+}
+
+function resetShard(shard, top = false) {
+  shard.angle = Math.random() * Math.PI * 2;
+  shard.sourceAngle = shard.angle;
+  shard.radius = PANORAMA_RADIUS - 1.1 + Math.random() * 0.8;
+  shard.y = top ? PANORAMA_HEIGHT * 0.34 + Math.random() * 24 : -PANORAMA_HEIGHT * 0.42 + Math.random() * PANORAMA_HEIGHT * 0.84;
+  shard.sourceY = shard.y;
+  shard.speed = 0.18 + Math.random() * 0.28;
+  shard.drift = -0.004 + Math.random() * 0.008;
+  shard.scale = 0.95 + Math.random() * 1.75;
+  shard.spin = Math.random() * Math.PI * 2;
+  shard.spinSpeed = -0.02 + Math.random() * 0.04;
+  shard.uSpan = 0.04 + Math.random() * 0.05;
+  shard.vSpan = 0.08 + Math.random() * 0.08;
+  applyShardTextureWindow(shard);
+}
+
+function updateShardMesh(shard) {
+  shard.angle += shard.drift;
+  shard.y -= shard.speed;
+  shard.spin += shard.spinSpeed;
+
+  if (shard.y < -PANORAMA_HEIGHT * 0.54) resetShard(shard, true);
+
+  const x = Math.sin(shard.angle) * shard.radius;
+  const z = Math.cos(shard.angle) * shard.radius;
+
+  shard.mesh.position.set(x, shard.y, z);
+  shard.mesh.lookAt(0, shard.y, 0);
+  shard.mesh.rotateZ(shard.spin);
+  shard.mesh.scale.setScalar(shard.scale);
+}
+
 function deviceLines() {
   const nav = typeof navigator === "undefined" ? {} : navigator;
   return [
     `[DEVICE] THREAD_HINT=${nav.hardwareConcurrency || "hidden"}`,
     `[DEVICE] MEM_HINT=${nav.deviceMemory ? `~${nav.deviceMemory}GB` : "hidden"}`,
     `[DEVICE] PLATFORM=${nav.userAgentData?.platform || nav.platform || "hidden"}`,
-    `[MODE] FAST DOM TEXT // THREE PANORAMA CYLINDER`,
+    `[MODE] FAST DOM TEXT // TRIANGLE 360 PANORAMA`,
   ];
 }
 
@@ -106,6 +212,8 @@ export default function WasmMachineScene() {
     let ringA;
     let ringB;
     let backgroundMesh;
+    let backgroundWire;
+    let fallingTriangles;
     let backgroundTexture;
     let animationId;
     let frame = 0;
@@ -181,7 +289,7 @@ export default function WasmMachineScene() {
       backgroundTexture.magFilter = THREE.LinearFilter;
       backgroundTexture.generateMipmaps = false;
 
-      const backgroundGeometry = new THREE.CylinderGeometry(34, 34, 96, 32, 1, true);
+      const backgroundGeometry = createTriangulatedPanoramaGeometry(38, 136, 28, 10);
       const backgroundMaterial = new THREE.MeshBasicMaterial({
         map: backgroundTexture,
         side: THREE.BackSide,
@@ -192,7 +300,59 @@ export default function WasmMachineScene() {
       backgroundMesh.rotation.y = Math.PI;
       backgroundMesh.renderOrder = -10;
       scene.add(backgroundMesh);
-      created.push(backgroundGeometry, backgroundMaterial);
+
+      const wireMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.14,
+        side: THREE.BackSide,
+        depthWrite: false,
+        depthTest: false,
+      });
+      backgroundWire = new THREE.Mesh(backgroundGeometry, wireMaterial);
+      backgroundWire.rotation.y = Math.PI;
+      backgroundWire.renderOrder = -9;
+      scene.add(backgroundWire);
+      created.push(backgroundGeometry, backgroundMaterial, wireMaterial);
+
+      const triangleCount = window.innerWidth < 760 ? FALLING_TRIANGLE_COUNT_MOBILE : FALLING_TRIANGLE_COUNT_DESKTOP;
+      const shardGeometry = createTriangleShardGeometry();
+      fallingTriangles = new THREE.Group();
+      fallingTriangles.renderOrder = -8;
+      fallingTriangles.userData.shards = [];
+
+      for (let i = 0; i < triangleCount; i += 1) {
+        const shardTexture = backgroundTexture.clone();
+        shardTexture.colorSpace = THREE.SRGBColorSpace;
+        shardTexture.wrapS = THREE.RepeatWrapping;
+        shardTexture.wrapT = THREE.ClampToEdgeWrapping;
+        shardTexture.minFilter = THREE.LinearFilter;
+        shardTexture.magFilter = THREE.LinearFilter;
+        shardTexture.generateMipmaps = false;
+        shardTexture.needsUpdate = true;
+
+        const shardMaterial = new THREE.MeshBasicMaterial({
+          map: shardTexture,
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.92,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          depthTest: false,
+        });
+
+        const shardMesh = new THREE.Mesh(shardGeometry, shardMaterial);
+        const shard = { mesh: shardMesh, texture: shardTexture };
+        resetShard(shard, false);
+        updateShardMesh(shard);
+        fallingTriangles.userData.shards.push(shard);
+        fallingTriangles.add(shardMesh);
+        created.push(shardMaterial, shardTexture);
+      }
+
+      scene.add(fallingTriangles);
+      created.push(shardGeometry);
 
       const coreGeometry = new THREE.IcosahedronGeometry(1.2, 0);
       const coreMaterial = new THREE.MeshBasicMaterial({ color: 0x8fdcff, wireframe: true, transparent: true, opacity: 0.82 });
@@ -228,7 +388,14 @@ export default function WasmMachineScene() {
         const wasmValue = wasm?.scanTick ? wasm.scanTick(frame) : (frame * 73) % 4096;
         const pulseValue = wasm?.pulse ? wasm.pulse(frame * 0.022) : Math.abs(Math.sin(frame * 0.044));
 
-        backgroundMesh.rotation.y += 0.018;
+        backgroundMesh.rotation.y += 0.014;
+        backgroundWire.rotation.y = backgroundMesh.rotation.y;
+
+        fallingTriangles.userData.shards.forEach((shard) => {
+          updateShardMesh(shard);
+        });
+        fallingTriangles.rotation.y = backgroundMesh.rotation.y;
+
         core.rotation.x += 0.04 + wasmValue * 0.0000006;
         core.rotation.y += 0.055;
         core.scale.setScalar(1 + pulseValue * 0.07);
@@ -278,7 +445,7 @@ export default function WasmMachineScene() {
 
       <section className="textOverlay" aria-label="WebAssembly diagnostic text overlay">
         <div className="overlayHead">
-          <div className="overlayKicker">SAFE WEB DIAGNOSTIC // FAST THREE PANORAMA // BYTESIZED</div>
+          <div className="overlayKicker">SAFE WEB DIAGNOSTIC // IMAGE TRIANGLES FALLING FROM PANORAMA // BYTESIZED</div>
           <h1 className="overlayTitle">WASM CORE</h1>
         </div>
 
