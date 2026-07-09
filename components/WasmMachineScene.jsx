@@ -9,8 +9,8 @@ const COLUMN_COUNT = 2;
 const MAX_LINES_PER_COLUMN = 54;
 const TEXT_UPDATE_MS = 650;
 const RENDER_FPS = 30;
-const FALLING_TRIANGLE_COUNT_DESKTOP = 34;
-const FALLING_TRIANGLE_COUNT_MOBILE = 20;
+const FALLING_TRIANGLE_COUNT_DESKTOP = 260;
+const FALLING_TRIANGLE_COUNT_MOBILE = 120;
 const PANORAMA_RADIUS = 38;
 const PANORAMA_HEIGHT = 136;
 
@@ -22,7 +22,7 @@ const BOOT_LINES = [
   "LOAD WASM MODULE ....................... PENDING",
   "TEXT STREAM MODE ....................... DOM DIRECT",
   "REACT TEXT RERENDER LOOP ............... DISABLED",
-  "FALLING TRIANGLE SHARDS ................ ENABLED",
+  "FALLING IMAGE TRIANGLE SHARDS .......... MAX RANDOM",
   "PARTICLE FIELD .......................... REMOVED",
   "BOOT COMPLETE // FAST THREE PATH ACTIVE",
 ];
@@ -56,7 +56,6 @@ function ascii(size = 8) {
   for (let i = 0; i < size; i += 1) result += chars[Math.floor(Math.random() * chars.length)];
   return result;
 }
-
 
 function createTriangulatedPanoramaGeometry(radius = PANORAMA_RADIUS, height = PANORAMA_HEIGHT, radialSegments = 28, heightSegments = 9) {
   const positions = [];
@@ -129,34 +128,64 @@ function applyShardTextureWindow(shard) {
 
 function resetShard(shard, top = false) {
   shard.angle = Math.random() * Math.PI * 2;
-  shard.sourceAngle = shard.angle;
-  shard.radius = PANORAMA_RADIUS - 1.1 + Math.random() * 0.8;
-  shard.y = top ? PANORAMA_HEIGHT * 0.34 + Math.random() * 24 : -PANORAMA_HEIGHT * 0.42 + Math.random() * PANORAMA_HEIGHT * 0.84;
-  shard.sourceY = shard.y;
-  shard.speed = 0.18 + Math.random() * 0.28;
-  shard.drift = -0.004 + Math.random() * 0.008;
-  shard.scale = 0.95 + Math.random() * 1.75;
+  shard.sourceAngle = shard.angle + (-0.09 + Math.random() * 0.18);
+  shard.radius = PANORAMA_RADIUS - 2.4 + Math.random() * 4.8;
+  shard.y = top
+    ? PANORAMA_HEIGHT * 0.3 + Math.random() * 34
+    : -PANORAMA_HEIGHT * 0.5 + Math.random() * PANORAMA_HEIGHT;
+  shard.sourceY = THREE.MathUtils.clamp(
+    shard.y + (-10 + Math.random() * 20),
+    -PANORAMA_HEIGHT * 0.5,
+    PANORAMA_HEIGHT * 0.5
+  );
+  shard.speed = 0.1 + Math.random() * 0.58;
+  shard.drift = -0.012 + Math.random() * 0.024;
+  shard.depthDrift = -0.006 + Math.random() * 0.012;
+  shard.scaleX = 1.8 + Math.random() * 5.6;
+  shard.scaleY = 1.5 + Math.random() * 6.2;
+  shard.flipX = Math.random() > 0.5 ? -1 : 1;
+  shard.flipY = Math.random() > 0.5 ? -1 : 1;
   shard.spin = Math.random() * Math.PI * 2;
-  shard.spinSpeed = -0.02 + Math.random() * 0.04;
-  shard.uSpan = 0.04 + Math.random() * 0.05;
-  shard.vSpan = 0.08 + Math.random() * 0.08;
+  shard.spinSpeed = -0.09 + Math.random() * 0.18;
+  shard.wobble = Math.random() * Math.PI * 2;
+  shard.wobbleSpeed = 0.018 + Math.random() * 0.07;
+  shard.opacity = 0.48 + Math.random() * 0.5;
+  shard.uSpan = 0.035 + Math.random() * 0.12;
+  shard.vSpan = 0.06 + Math.random() * 0.18;
+
+  if (shard.mesh?.material) {
+    shard.mesh.material.opacity = shard.opacity;
+  }
+
   applyShardTextureWindow(shard);
 }
 
 function updateShardMesh(shard) {
   shard.angle += shard.drift;
+  shard.radius += shard.depthDrift;
   shard.y -= shard.speed;
   shard.spin += shard.spinSpeed;
+  shard.wobble += shard.wobbleSpeed;
 
-  if (shard.y < -PANORAMA_HEIGHT * 0.54) resetShard(shard, true);
+  if (shard.radius < PANORAMA_RADIUS - 3.6 || shard.radius > PANORAMA_RADIUS + 3.6) {
+    shard.depthDrift *= -1;
+  }
+
+  if (shard.y < -PANORAMA_HEIGHT * 0.56) resetShard(shard, true);
 
   const x = Math.sin(shard.angle) * shard.radius;
   const z = Math.cos(shard.angle) * shard.radius;
+  const wobbleX = 1 + Math.sin(shard.wobble) * 0.18;
+  const wobbleY = 1 + Math.cos(shard.wobble * 0.8) * 0.16;
 
   shard.mesh.position.set(x, shard.y, z);
   shard.mesh.lookAt(0, shard.y, 0);
   shard.mesh.rotateZ(shard.spin);
-  shard.mesh.scale.setScalar(shard.scale);
+  shard.mesh.scale.set(
+    shard.scaleX * wobbleX * shard.flipX,
+    shard.scaleY * wobbleY * shard.flipY,
+    1
+  );
 }
 
 function deviceLines() {
