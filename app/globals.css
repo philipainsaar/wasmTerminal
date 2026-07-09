@@ -18,7 +18,7 @@ body {
 }
 
 body {
-  font-family: "Rubik Glitch Pop", cursive;
+  font-family: "Bytesized", ui-monospace, monospace;
 }
 
 .machineScreen {
@@ -30,35 +30,10 @@ body {
   background: #fffaff;
 }
 
-.imageOrbit {
-  position: absolute;
-  inset: -8vh -12vw;
-  z-index: 0;
-  background-image: url("/background-360.jpg");
-  background-repeat: repeat-x;
-  background-size: auto 118%;
-  background-position: 0% 50%;
-  opacity: 0.96;
-  transform: translateZ(0) scale(1.05);
-  will-change: background-position;
-  animation: imageOrbit360 8s linear infinite;
-}
-
-.softTint {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 20% 16%, rgba(255, 168, 223, 0.24), transparent 28%),
-    radial-gradient(circle at 82% 30%, rgba(143, 220, 255, 0.22), transparent 32%),
-    linear-gradient(180deg, rgba(255, 250, 255, 0.15), rgba(255, 242, 251, 0.2));
-}
-
 .threeLayer {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 0;
   pointer-events: none;
 }
 
@@ -68,26 +43,36 @@ body {
   height: 100%;
 }
 
+.softTint {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 20% 16%, rgba(255, 168, 223, 0.18), transparent 28%),
+    radial-gradient(circle at 82% 30%, rgba(143, 220, 255, 0.16), transparent 32%),
+    linear-gradient(180deg, rgba(255, 250, 255, 0.08), rgba(255, 242, 251, 0.12));
+}
+
 .scanlines {
   position: absolute;
   inset: 0;
-  z-index: 4;
+  z-index: 2;
   pointer-events: none;
-  opacity: 0.08;
+  opacity: 0.055;
   background: repeating-linear-gradient(
     to bottom,
     rgba(255, 255, 255, 0.18) 0,
     rgba(255, 255, 255, 0.18) 1px,
     transparent 1px,
-    transparent 5px
+    transparent 6px
   );
 }
 
 .textOverlay {
-  --pulse: 1;
   position: absolute;
   inset: 0;
-  z-index: 5;
+  z-index: 3;
   padding: max(14px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom))
     max(12px, env(safe-area-inset-left));
   display: flex;
@@ -99,34 +84,35 @@ body {
 .overlayHead {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
 }
 
 .overlayKicker {
-  color: rgba(255, 255, 255, 0.92);
-  font-size: clamp(0.62rem, 1.45vw, 0.92rem);
-  line-height: 1.1;
-  text-shadow: 0 0 8px rgba(143, 220, 255, 0.55);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: clamp(0.72rem, 1.65vw, 1.08rem);
+  line-height: 1.02;
+  letter-spacing: 0.03em;
+  text-shadow: 0 0 6px rgba(143, 220, 255, 0.42);
 }
 
 .overlayTitle {
   margin: 0;
   max-width: min(96vw, 1100px);
   color: #ffffff;
-  font-size: clamp(1.75rem, 6.8vw, 5.2rem);
-  line-height: 0.82;
-  letter-spacing: 0.02em;
+  font-size: clamp(2.2rem, 9vw, 7.4rem);
+  line-height: 0.72;
+  letter-spacing: 0.015em;
   text-shadow:
-    2px 0 0 rgba(255, 78, 211, 0.44),
-    -2px 0 0 rgba(70, 221, 255, 0.38),
-    0 0 14px rgba(255, 255, 255, 0.58);
+    1px 0 0 rgba(255, 78, 211, 0.36),
+    -1px 0 0 rgba(70, 221, 255, 0.32),
+    0 0 10px rgba(255, 255, 255, 0.48);
 }
 
 .columnGrid {
   flex: 1 1 auto;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(0.32rem, 0.9vw, 0.72rem);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(0.42rem, 1vw, 0.9rem);
   overflow: hidden;
   min-height: 0;
 }
@@ -137,54 +123,21 @@ body {
   overflow: hidden;
   white-space: pre-wrap;
   word-break: break-word;
-  color: rgba(255, 255, 255, 0.94);
-  font-family: "Rubik Glitch Pop", cursive;
-  font-size: clamp(0.48rem, 0.82vw, 0.74rem);
-  line-height: 1.04;
-  letter-spacing: 0.018em;
-  text-shadow: 0 0 7px rgba(255, 255, 255, 0.4);
-  transform: translateY(calc(var(--pulse) * -3px));
+  color: rgba(255, 255, 255, 0.92);
+  font-family: "Bytesized", ui-monospace, monospace;
+  font-size: clamp(0.58rem, 1vw, 0.9rem);
+  line-height: 0.98;
+  letter-spacing: 0.025em;
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.34);
+  transform: translateZ(0);
 }
 
 .terminalColumn:nth-child(2) {
-  opacity: 0.82;
-  transform: translateY(calc(var(--pulse) * -14px));
+  opacity: 0.74;
+  transform: translate3d(0, -16px, 0);
 }
 
-.terminalColumn:nth-child(3) {
-  opacity: 0.72;
-  transform: translateY(calc(var(--pulse) * -25px));
-}
-
-@keyframes imageOrbit360 {
-  from {
-    background-position: 0% 50%;
-  }
-  to {
-    background-position: 100% 50%;
-  }
-}
-
-@media (max-width: 860px) {
-  .columnGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .terminalColumn {
-    font-size: clamp(0.46rem, 1.65vw, 0.68rem);
-  }
-
-  .terminalColumn:nth-child(3) {
-    display: none;
-  }
-}
-
-@media (max-width: 520px) {
-  .imageOrbit {
-    animation-duration: 6s;
-    background-size: auto 112%;
-  }
-
+@media (max-width: 760px) {
   .columnGrid {
     grid-template-columns: 1fr;
   }
@@ -194,11 +147,11 @@ body {
   }
 
   .overlayTitle {
-    font-size: clamp(1.55rem, 9.8vw, 3rem);
+    font-size: clamp(2rem, 12vw, 4.3rem);
   }
 
   .terminalColumn {
-    font-size: clamp(0.46rem, 2.25vw, 0.64rem);
-    line-height: 1.02;
+    font-size: clamp(0.6rem, 2.6vw, 0.86rem);
+    line-height: 0.96;
   }
 }
