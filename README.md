@@ -1,15 +1,25 @@
-# Wasm Machine Core V3
+# Wasm Diagnostic Fast Version
 
-A safe **Next.js + Three.js + WebAssembly** diagnostic-style website.
+This is the optimized version of the Next.js + Three.js + WebAssembly diagnostic screen.
 
-## Version 3 changes
+## What changed for speed
 
-- Removed the lightning glyph and other non-ASCII glitch symbols from the generated terminal output
-- Uses ASCII-only glitch text such as `##`, `@@`, `%%`, `!!`, `??`, `//`, `<<`, and `>>`
-- Adds a real image file background: `public/background-360.jpg`
-- Uses the image as a 360-degree rotating Three.js sphere behind the machine core
-- Keeps the multi-column assembly text flood from V2
-- Keeps the no-window and no-button layout
+- Reduced React text updates from about every 7 frames to about every 30 frames
+- Reduced maximum terminal lines from 360 to 150
+- Reduced generated assembly burst size
+- Reduced hex dump frequency
+- Reduced columns from 4 to 3 on desktop
+- Uses 1 column on very small mobile screens
+- Capped renderer pixel ratio at 1 for mobile speed
+- Disabled WebGL antialiasing
+- Added `powerPreference: "high-performance"`
+- Reduced 360 background sphere geometry from 64x32 to 24x12
+- Reduced core geometry detail
+- Reduced ring segments
+- Reduced particles from 220 to 70
+- Removed expensive constant text skew animation
+- Simplified text shadows and overlays
+- Increased background rotation speed so it feels less slow
 
 ## Run
 
@@ -24,16 +34,18 @@ Open:
 http://localhost:3000
 ```
 
-## Replace the background image
-
-Replace this file with your own 2:1 panorama-style image:
+## Project structure
 
 ```txt
+app/page.jsx
+app/layout.jsx
+app/globals.css
+components/WasmMachineScene.jsx
 public/background-360.jpg
+public/machine_core.wasm
+wasm-src/machine_core.c
 ```
 
-A 2:1 image such as `2048x1024`, `4096x2048`, or similar works best for the rotating inside-sphere background.
+## Still browser-safe
 
-## Safety note
-
-This project does not bypass browser security. The text is stylized visual telemetry, while the Wasm module and browser hints are loaded through normal safe browser APIs.
+This project does not bypass browser security. It shows browser-safe hints, real Wasm module info, and stylized fake assembly text.
