@@ -5,42 +5,40 @@ import * as THREE from "three";
 
 const MAX_LINES = 360;
 const WASM_URL = "/machine_core.wasm";
+const BACKGROUND_URL = "/background-360.jpg";
 const COLUMNS = 4;
 
 const BOOT_STEPS = [
   "DREAM-WEB BIOS 2.0 // SOFT GLITCH POST",
   "COPYRIGHT SAFE_BROWSER_SANDBOX // NO PRIVATE MEMORY ACCESS",
-  "INITIALIZE PASTEL VECTOR DISPLAY ................ OK",
+  "INITIALIZE 360 IMAGE BACKDROP ................... OK",
   "INITIALIZE THREE.JS WEBGL PIPE .................. OK",
   "INITIALIZE RUBIK GLITCH POP GLYPH ROM ........... OK",
   "MOUNT /public/machine_core.wasm ................. PENDING",
   "ENABLE MAXIMUM TEXT FLOOD ....................... OK",
   "ENABLE FAKE HEX DUMP MODE ....................... OK",
   "ENABLE CRT/VHS RASTER JITTER .................... OK",
-  "BOOT SEQUENCE COMPLETE // ENTERING GLITCH ORBIT",
+  "BOOT SEQUENCE COMPLETE // ENTERING IMAGE ORBIT",
 ];
 
 const GLITCH_TOKENS = [
-  "▓",
-  "▒",
-  "░",
-  "█",
-  "∆",
-  "¤",
-  "※",
-  "⚡",
-  "◇",
-  "◆",
-  "◌",
-  "◍",
+  "##",
+  "@@",
+  "%%",
+  "$$",
+  "**",
+  "++",
+  "==",
+  "!!",
+  "??",
   "::",
   "//",
   "<<",
   ">>",
   "~~",
   "<>",
-  "µ",
   "~#",
+  "#~",
   "NULL*",
   "SAFE!",
   "VOID",
@@ -161,7 +159,7 @@ function randomAddress() {
 }
 
 function randomAsciiBlock(size = 8) {
-  const chars = "01ABCDEF<>[]{}/*-_=+|~^:;▓▒░█∆¤※⚡◇◆◌◍";
+  const chars = "01ABCDEF<>[]{}/*-_=+|~^:;#$%@!?";
   let block = "";
 
   for (let i = 0; i < size; i += 1) {
@@ -176,7 +174,7 @@ function makeHexDump(frame, lines = 6) {
 
   for (let i = 0; i < lines; i += 1) {
     const bytes = Array.from({ length: 16 }, () => randomHex(2)).join(" ");
-    const ascii = Array.from({ length: 16 }, () => choose([".", "#", "@", "~", "*", "+", "░", "▒", "▓"])).join("");
+    const ascii = Array.from({ length: 16 }, () => choose([".", "#", "@", "~", "*", "+", "%", "$", "!"])).join("");
     result.push(`0x${randomHex(8)}  ${bytes}  |${ascii}|`);
   }
 
@@ -329,10 +327,6 @@ export default function WasmMachineScene() {
   const modeRef = useRef("BOOTING");
   const [terminalLines, setTerminalLines] = useState(["[BOOT] STARTING BIOS GLYPH STORM..."]);
 
-  const backgroundHex = useMemo(() => {
-    return Array.from({ length: 70 }, (_, index) => `${String(index).padStart(2, "0")} ${randomAsciiBlock(42)}`);
-  }, []);
-
   const columnLines = useMemo(() => buildColumnLines(terminalLines), [terminalLines]);
 
   useEffect(() => {
@@ -340,6 +334,8 @@ export default function WasmMachineScene() {
     let renderer;
     let scene;
     let camera;
+    let backgroundSphere;
+    let backgroundTexture;
     let core;
     let ringA;
     let ringB;
@@ -392,6 +388,25 @@ export default function WasmMachineScene() {
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       mount.appendChild(renderer.domElement);
+
+      backgroundTexture = new THREE.TextureLoader().load(BACKGROUND_URL);
+      backgroundTexture.colorSpace = THREE.SRGBColorSpace;
+      backgroundTexture.wrapS = THREE.RepeatWrapping;
+      backgroundTexture.wrapT = THREE.ClampToEdgeWrapping;
+      backgroundTexture.repeat.set(1, 1);
+
+      const backgroundGeometry = new THREE.SphereGeometry(42, 64, 32);
+      const backgroundMaterial = new THREE.MeshBasicMaterial({
+        map: backgroundTexture,
+        side: THREE.BackSide,
+        transparent: true,
+        opacity: 0.92,
+        depthWrite: false,
+      });
+      backgroundSphere = new THREE.Mesh(backgroundGeometry, backgroundMaterial);
+      backgroundSphere.rotation.y = Math.PI;
+      scene.add(backgroundSphere);
+      created.push(backgroundGeometry, backgroundMaterial, backgroundTexture);
 
       const coreGeometry = new THREE.IcosahedronGeometry(1.32, 2);
       const coreMaterial = new THREE.MeshBasicMaterial({
@@ -460,6 +475,11 @@ export default function WasmMachineScene() {
         const noiseValue = wasm?.noise2
           ? wasm.noise2(frame, Math.round(pulseValue * 1000))
           : (frame * 31) % 1024;
+
+        if (backgroundSphere) {
+          backgroundSphere.rotation.y += 0.0018;
+          backgroundSphere.rotation.x = Math.sin(frame * 0.0015) * 0.035;
+        }
 
         const pulseScale = 1 + pulseValue * 0.16;
         core.scale.setScalar(pulseScale);
@@ -530,19 +550,14 @@ export default function WasmMachineScene() {
       <div className="glowLayer glowTwo" />
       <div className="vhsWash" />
       <div ref={mountRef} className="threeLayer" />
-      <div className="backgroundHex" aria-hidden="true">
-        {backgroundHex.map((line, index) => (
-          <span key={`${line}-${index}`}>{line}</span>
-        ))}
-      </div>
       <div className="noiseVeil" />
       <div className="scanlines" />
       <div className="vhsTear" />
 
       <section ref={overlayRef} className="textOverlay" aria-label="WebAssembly diagnostic text overlay">
         <div className="overlayHead">
-          <div className="overlayKicker">SAFE WEB DIAGNOSTIC // BIOS V2 // MULTI-COLUMN GLITCH BUS</div>
-          <h1 className="overlayTitle">WASM MACHINE CORE V2</h1>
+          <div className="overlayKicker">SAFE WEB DIAGNOSTIC // BIOS V3 // ROTATING IMAGE BACKDROP</div>
+          <h1 className="overlayTitle">WASM MACHINE CORE V3</h1>
         </div>
 
         <div className="columnGrid">
