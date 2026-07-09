@@ -1,10 +1,25 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
-const MAX_LINES = 140;
+const MAX_LINES = 360;
 const WASM_URL = "/machine_core.wasm";
+const COLUMNS = 4;
+
+const BOOT_STEPS = [
+  "DREAM-WEB BIOS 2.0 // SOFT GLITCH POST",
+  "COPYRIGHT SAFE_BROWSER_SANDBOX // NO PRIVATE MEMORY ACCESS",
+  "INITIALIZE PASTEL VECTOR DISPLAY ................ OK",
+  "INITIALIZE THREE.JS WEBGL PIPE .................. OK",
+  "INITIALIZE RUBIK GLITCH POP GLYPH ROM ........... OK",
+  "MOUNT /public/machine_core.wasm ................. PENDING",
+  "ENABLE MAXIMUM TEXT FLOOD ....................... OK",
+  "ENABLE FAKE HEX DUMP MODE ....................... OK",
+  "ENABLE CRT/VHS RASTER JITTER .................... OK",
+  "BOOT SEQUENCE COMPLETE // ENTERING GLITCH ORBIT",
+];
+
 const GLITCH_TOKENS = [
   "▓",
   "▒",
@@ -14,6 +29,10 @@ const GLITCH_TOKENS = [
   "¤",
   "※",
   "⚡",
+  "◇",
+  "◆",
+  "◌",
+  "◍",
   "::",
   "//",
   "<<",
@@ -22,21 +41,35 @@ const GLITCH_TOKENS = [
   "<>",
   "µ",
   "~#",
+  "NULL*",
+  "SAFE!",
+  "VOID",
+  "BIOS",
 ];
+
 const OPCODES = [
   "MOV",
+  "MOVZX",
+  "LEA",
   "XOR",
   "AND",
   "OR",
   "NOT",
   "SHL",
   "SHR",
+  "ROL",
+  "ROR",
   "SUB",
   "ADD",
   "ADC",
   "MUL",
+  "IMUL",
   "F32.MUL",
   "F32.ADD",
+  "F32.SIN",
+  "F32.COS",
+  "I32.LOAD",
+  "I32.STORE",
   "I32.NOISE",
   "PULSE",
   "STACK.PUSH",
@@ -48,10 +81,15 @@ const OPCODES = [
   "SCAN.RASTER",
   "TEXTURE.BIND",
   "WASM.CALL",
+  "WASM.PAGE",
   "BR_IF",
+  "CALL",
+  "RET",
   "JMP",
   "NOP",
+  "HALT?",
 ];
+
 const TARGETS = [
   "R0",
   "R1",
@@ -67,7 +105,10 @@ const TARGETS = [
   "DX",
   "VEC0",
   "VEC1",
+  "VEC2",
+  "VEC3",
   "BUS0",
+  "BUS1",
   "STACK",
   "GPU_PIPE",
   "SCAN_BUFFER",
@@ -78,7 +119,11 @@ const TARGETS = [
   "WASM_PAGE",
   "WAVE_TABLE",
   "GHOST_CACHE",
+  "PASTEL_RAM",
+  "CRT_BEAM",
+  "DREAM_BUS",
 ];
+
 const CALLS = [
   "$scanTick",
   "$pulse",
@@ -90,6 +135,10 @@ const CALLS = [
   "$safe_mode",
   "$echo_bus",
   "$page_swap",
+  "$dreamcast_not_real",
+  "$webgl_orbit",
+  "$crt_flicker",
+  "$memory_theater",
 ];
 
 function choose(list) {
@@ -112,7 +161,7 @@ function randomAddress() {
 }
 
 function randomAsciiBlock(size = 8) {
-  const chars = "01ABCDEF<>[]{}/*-_=+|~^:;▓▒░█∆¤※⚡";
+  const chars = "01ABCDEF<>[]{}/*-_=+|~^:;▓▒░█∆¤※⚡◇◆◌◍";
   let block = "";
 
   for (let i = 0; i < size; i += 1) {
@@ -120,6 +169,18 @@ function randomAsciiBlock(size = 8) {
   }
 
   return block;
+}
+
+function makeHexDump(frame, lines = 6) {
+  const result = [`[HEX-DUMP // SIMULATED] PAGE=${randomHex(2)} FRAME=${String(frame).padStart(5, "0")}`];
+
+  for (let i = 0; i < lines; i += 1) {
+    const bytes = Array.from({ length: 16 }, () => randomHex(2)).join(" ");
+    const ascii = Array.from({ length: 16 }, () => choose([".", "#", "@", "~", "*", "+", "░", "▒", "▓"])).join("");
+    result.push(`0x${randomHex(8)}  ${bytes}  |${ascii}|`);
+  }
+
+  return result;
 }
 
 function getDeviceHints() {
@@ -168,13 +229,13 @@ function formatExportList(exportsList) {
 
 function makeBootLines({ device, gpu }) {
   return [
-    "[SAFE-BOOT] RUBIK GLITCH POP OVERLAY ACTIVE",
-    "[NOTICE] Browser sandbox preserved // no private RAM or native CPU instruction access",
-    `[DEVICE] THREAD_HINT=${device.cpuThreads}  MEM_HINT=${device.memory}  PLATFORM=${device.platform}`,
+    ...BOOT_STEPS.slice(0, 3),
+    `[DEVICE] THREAD_HINT=${device.cpuThreads}  MEM_HINT=${device.memory}`,
+    `[DEVICE] PLATFORM=${device.platform}  LANG=${device.language}`,
     `[DEVICE] GPU_HINT=${gpu}`,
-    `[LOCALE] LANG=${device.language}  UA=${String(device.userAgent).slice(0, 54)}...`,
-    "[PIPE] NEXT.JS -> THREE.JS -> WASM -> GLITCH TEXT STREAM",
-    "[WASM] FETCH /machine_core.wasm",
+    `[DEVICE] UA=${String(device.userAgent).slice(0, 72)}...`,
+    ...BOOT_STEPS.slice(3),
+    `[SAFETY] Browser sandbox remains locked // this is visual telemetry theater`,
   ];
 }
 
@@ -185,23 +246,23 @@ function makeWasmSummary(exports, exportsList, imports, pages) {
     `[WASM] exports=${formatExportList(exportsList)}`,
     `[WASM] memory_pages=${pages}  memory_total=${pages === "hidden" ? "hidden" : `${pages * 64}KB`}`,
     `[WASM] magic=0x${exports.getMagic?.().toString(16).toUpperCase() || "hidden"}`,
-    "[MODE] VISUAL CORE ONLINE // CHAOTIC TEXT BURST ENABLED",
+    "[MODE] GLYPH STORM ONLINE // MULTI-COLUMN BUS ENABLED",
   ];
 }
 
 function makeGlitchBurst(frame, wasmValue, pulseValue, noiseValue, mode) {
   const pulseInt = Math.round((pulseValue || 0) * 10000);
-  const burstSize = 10 + Math.floor(Math.random() * 8);
+  const burstSize = 18 + Math.floor(Math.random() * 18);
   const lines = [];
 
-  lines.push(`[FRAME ${String(frame).padStart(5, "0")}] MODE=${mode} ${randomAsciiBlock(10)}`);
+  lines.push(`[FRAME ${String(frame).padStart(5, "0")}] ${mode} ${randomAsciiBlock(16)} ORBIT=${randomHex(4)}`);
 
   for (let i = 0; i < burstSize; i += 1) {
-    const selector = Math.floor(Math.random() * 8);
+    const selector = Math.floor(Math.random() * 11);
 
     if (selector === 0) {
       lines.push(
-        `> ${choose(OPCODES)} ${choose(TARGETS)}, 0x${randomHex(4)}  ${choose(GLITCH_TOKENS)} ${randomAsciiBlock(6)}`
+        `> ${choose(OPCODES)} ${choose(TARGETS)}, 0x${randomHex(4)}  ${choose(GLITCH_TOKENS)} ${randomAsciiBlock(10)}`
       );
     } else if (selector === 1) {
       lines.push(
@@ -218,37 +279,61 @@ function makeGlitchBurst(frame, wasmValue, pulseValue, noiseValue, mode) {
           .toUpperCase()} | SCAN=0x${Number(wasmValue || 0).toString(16).toUpperCase()}`
       );
     } else if (selector === 4) {
-      lines.push(
-        `> GLITCH.VECTOR ${randomAsciiBlock(4)} ${randomAsciiBlock(4)} ${randomAsciiBlock(4)} ${randomAsciiBlock(4)}`
-      );
+      lines.push(`> GLITCH.VECTOR ${randomAsciiBlock(6)} ${randomAsciiBlock(6)} ${randomAsciiBlock(6)}`);
     } else if (selector === 5) {
       lines.push(
         `> TRACE ${choose(TARGETS)} -> ${choose(TARGETS)} -> ${choose(TARGETS)} // ${choose(CALLS)} ${choose(GLITCH_TOKENS)}`
       );
     } else if (selector === 6) {
+      lines.push(`> DMA.GLYPH_BANK[0x${randomHex(2)}] -> THREE_BUFFER[${frame % 64}] // ${randomAsciiBlock(18)}`);
+    } else if (selector === 7) {
+      lines.push(`[VHS-TEAR] y=${randomHex(3)} dx=${choose(["-12", "-8", "4", "9", "13"])} ${randomAsciiBlock(24)}`);
+    } else if (selector === 8) {
       lines.push(
-        `> DMA.GLYPH_BANK[0x${randomHex(2)}] -> THREE_BUFFER[${frame % 64}] // ${randomAsciiBlock(12)}`
+        `> ${choose(OPCODES)} ${choose(TARGETS)}, ${choose(TARGETS)} ; FLAG=${choose([
+          "ZERO",
+          "CARRY",
+          "SAFE",
+          "GLITCH",
+          "WAVE",
+          "LATCH",
+        ])} ; ${choose(GLITCH_TOKENS)} ${randomHex(6)}`
       );
+    } else if (selector === 9) {
+      lines.push(`[CRT] BEAM=${randomHex(4)} PHOSPHOR=${randomHex(2)} ${choose(GLITCH_TOKENS)} ${randomAsciiBlock(20)}`);
     } else {
-      lines.push(
-        `> ${choose(OPCODES)} ${choose(TARGETS)}, ${choose(TARGETS)} ; FLAG=${choose(["ZERO", "CARRY", "SAFE", "GLITCH", "WAVE", "LATCH"])} ; ${choose(GLITCH_TOKENS)} ${randomHex(6)}`
-      );
+      lines.push(`[DREAM-BUS] ${choose(TARGETS)}:${randomHex(4)} ${choose(CALLS)} ${randomAsciiBlock(22)}`);
     }
   }
 
-  if (Math.random() > 0.4) {
-    lines.push(`[GLITCH] ${randomAsciiBlock(18)} ${choose(GLITCH_TOKENS)} ${randomAsciiBlock(18)}`);
+  if (frame % 60 === 0 || Math.random() > 0.72) {
+    lines.push(...makeHexDump(frame, 3 + Math.floor(Math.random() * 4)));
   }
 
   return lines;
 }
 
+function buildColumnLines(lines) {
+  const buckets = Array.from({ length: COLUMNS }, () => []);
+  lines.forEach((line, index) => {
+    buckets[index % COLUMNS].push(line);
+  });
+  return buckets;
+}
+
 export default function WasmMachineScene() {
   const mountRef = useRef(null);
+  const overlayRef = useRef(null);
   const wasmRef = useRef(null);
   const frameRef = useRef(0);
   const modeRef = useRef("BOOTING");
-  const [terminalLines, setTerminalLines] = useState(["[BOOT] STARTING..."]);
+  const [terminalLines, setTerminalLines] = useState(["[BOOT] STARTING BIOS GLYPH STORM..."]);
+
+  const backgroundHex = useMemo(() => {
+    return Array.from({ length: 70 }, (_, index) => `${String(index).padStart(2, "0")} ${randomAsciiBlock(42)}`);
+  }, []);
+
+  const columnLines = useMemo(() => buildColumnLines(terminalLines), [terminalLines]);
 
   useEffect(() => {
     let disposed = false;
@@ -258,6 +343,7 @@ export default function WasmMachineScene() {
     let core;
     let ringA;
     let ringB;
+    let ringC;
     let particles;
     let animationId;
     const created = [];
@@ -299,7 +385,7 @@ export default function WasmMachineScene() {
 
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 100);
-      camera.position.set(0, 0.2, 7);
+      camera.position.set(0, 0.12, 7);
 
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -307,7 +393,7 @@ export default function WasmMachineScene() {
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       mount.appendChild(renderer.domElement);
 
-      const coreGeometry = new THREE.IcosahedronGeometry(1.35, 2);
+      const coreGeometry = new THREE.IcosahedronGeometry(1.32, 2);
       const coreMaterial = new THREE.MeshBasicMaterial({
         color: 0x8fdcff,
         wireframe: true,
@@ -319,39 +405,34 @@ export default function WasmMachineScene() {
       created.push(coreGeometry, coreMaterial);
 
       const ringGeometry = new THREE.TorusGeometry(1.95, 0.012, 8, 96);
-      const ringMaterialA = new THREE.MeshBasicMaterial({
-        color: 0xffa8df,
-        transparent: true,
-        opacity: 0.88,
-      });
-      const ringMaterialB = new THREE.MeshBasicMaterial({
-        color: 0xb9a6ff,
-        transparent: true,
-        opacity: 0.78,
-      });
+      const ringMaterialA = new THREE.MeshBasicMaterial({ color: 0xffa8df, transparent: true, opacity: 0.9 });
+      const ringMaterialB = new THREE.MeshBasicMaterial({ color: 0xb9a6ff, transparent: true, opacity: 0.8 });
+      const ringMaterialC = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.56 });
       ringA = new THREE.Mesh(ringGeometry, ringMaterialA);
       ringB = new THREE.Mesh(ringGeometry, ringMaterialB);
+      ringC = new THREE.Mesh(ringGeometry, ringMaterialC);
       ringA.rotation.x = Math.PI / 2.35;
       ringB.rotation.y = Math.PI / 2.5;
-      scene.add(ringA, ringB);
-      created.push(ringGeometry, ringMaterialA, ringMaterialB);
+      ringC.rotation.z = Math.PI / 2.2;
+      scene.add(ringA, ringB, ringC);
+      created.push(ringGeometry, ringMaterialA, ringMaterialB, ringMaterialC);
 
       const particleGeometry = new THREE.BufferGeometry();
-      const particleCount = 160;
+      const particleCount = 220;
       const positions = new Float32Array(particleCount * 3);
 
       for (let i = 0; i < particleCount; i += 1) {
-        const radius = 2.2 + Math.random() * 2.5;
+        const radius = 2.2 + Math.random() * 3.2;
         const angle = Math.random() * Math.PI * 2;
         positions[i * 3] = Math.cos(angle) * radius;
-        positions[i * 3 + 1] = (Math.random() - 0.5) * 5;
-        positions[i * 3 + 2] = Math.sin(angle) * radius - Math.random() * 3;
+        positions[i * 3 + 1] = (Math.random() - 0.5) * 5.6;
+        positions[i * 3 + 2] = Math.sin(angle) * radius - Math.random() * 3.6;
       }
 
       particleGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
       const particleMaterial = new THREE.PointsMaterial({
         color: 0xffffff,
-        size: 0.035,
+        size: 0.032,
         transparent: true,
         opacity: 0.92,
       });
@@ -380,20 +461,30 @@ export default function WasmMachineScene() {
           ? wasm.noise2(frame, Math.round(pulseValue * 1000))
           : (frame * 31) % 1024;
 
-        const pulseScale = 1 + pulseValue * 0.12;
+        const pulseScale = 1 + pulseValue * 0.16;
         core.scale.setScalar(pulseScale);
-        core.rotation.x += 0.005 + wasmValue * 0.0000008;
-        core.rotation.y += 0.009;
+        core.rotation.x += 0.006 + wasmValue * 0.0000009;
+        core.rotation.y += 0.011;
+        core.rotation.z += 0.003;
 
-        ringA.rotation.z += 0.007;
-        ringB.rotation.x += 0.006;
-        particles.rotation.y -= 0.0018;
-        particles.rotation.x += 0.0009;
+        ringA.rotation.z += 0.009;
+        ringB.rotation.x += 0.008;
+        ringC.rotation.y -= 0.007;
+        particles.rotation.y -= 0.0022;
+        particles.rotation.x += 0.0011;
 
-        const huePulse = 0.55 + pulseValue * 0.08;
-        core.material.color.setHSL(huePulse, 0.85, 0.75);
+        const huePulse = 0.54 + pulseValue * 0.1;
+        core.material.color.setHSL(huePulse, 0.9, 0.76);
 
-        if (frame % 10 === 0) {
+        if (overlayRef.current) {
+          const jitterX = Math.sin(frame * 0.21) * pulseValue * 10;
+          const jitterY = Math.cos(frame * 0.17) * pulseValue * 4;
+          overlayRef.current.style.setProperty("--jitter-x", `${jitterX.toFixed(2)}px`);
+          overlayRef.current.style.setProperty("--jitter-y", `${jitterY.toFixed(2)}px`);
+          overlayRef.current.style.setProperty("--pulse", String(0.65 + pulseValue * 0.35));
+        }
+
+        if (frame % 7 === 0) {
           appendLines(makeGlitchBurst(frame, wasmValue, pulseValue, noiseValue, modeRef.current));
         }
 
@@ -412,11 +503,19 @@ export default function WasmMachineScene() {
     const gpu = getGpuHint();
     setTerminalLines(makeBootLines({ device, gpu }));
 
+    const bootTimer = setInterval(() => {
+      appendLines([choose(BOOT_STEPS), `[POST] ${randomAsciiBlock(24)} ${choose(GLITCH_TOKENS)} ${randomHex(8)}`]);
+    }, 280);
+
     const removeResize = setupThree();
     loadWasm();
 
+    const stopBootTimer = setTimeout(() => clearInterval(bootTimer), 2100);
+
     return () => {
       disposed = true;
+      clearInterval(bootTimer);
+      clearTimeout(stopBootTimer);
       cancelAnimationFrame(animationId);
       removeResize?.();
       if (renderer) renderer.dispose();
@@ -429,20 +528,31 @@ export default function WasmMachineScene() {
     <main className="machineScreen">
       <div className="glowLayer glowOne" />
       <div className="glowLayer glowTwo" />
+      <div className="vhsWash" />
       <div ref={mountRef} className="threeLayer" />
+      <div className="backgroundHex" aria-hidden="true">
+        {backgroundHex.map((line, index) => (
+          <span key={`${line}-${index}`}>{line}</span>
+        ))}
+      </div>
       <div className="noiseVeil" />
       <div className="scanlines" />
+      <div className="vhsTear" />
 
-      <section className="textOverlay" aria-label="WebAssembly diagnostic text overlay">
+      <section ref={overlayRef} className="textOverlay" aria-label="WebAssembly diagnostic text overlay">
         <div className="overlayHead">
-          <div className="overlayKicker">SAFE WEB DIAGNOSTIC // GLITCH STREAM // NO WINDOWS // NO BUTTONS</div>
-          <h1 className="overlayTitle">WASM MACHINE CORE</h1>
+          <div className="overlayKicker">SAFE WEB DIAGNOSTIC // BIOS V2 // MULTI-COLUMN GLITCH BUS</div>
+          <h1 className="overlayTitle">WASM MACHINE CORE V2</h1>
         </div>
 
-        <div className="terminalStream">
-          {terminalLines.map((line, index) => (
-            <div key={`${line}-${index}`} className={line === "" ? "terminalSpacer" : "terminalLine"}>
-              {line}
+        <div className="columnGrid">
+          {columnLines.map((column, columnIndex) => (
+            <div className="terminalColumn" key={`column-${columnIndex}`}>
+              {column.map((line, index) => (
+                <div key={`${line}-${index}`} className={line === "" ? "terminalSpacer" : "terminalLine"}>
+                  {line}
+                </div>
+              ))}
             </div>
           ))}
         </div>
